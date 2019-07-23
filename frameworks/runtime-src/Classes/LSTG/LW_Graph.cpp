@@ -133,35 +133,11 @@ static int PostEffect(lua_State* L) noexcept
 		return luaL_error(L, "PostEffect failed.");
 	return 0;
 }
-//static int PostEffectCapture(lua_State* L) noexcept
-//{
-//	if (!LRR.postEffectCapture())
-//		return luaL_error(L, "PostEffectCapture failed.");
-//	return 0;
-//}
-//static int PostEffectApply(lua_State* L) noexcept
-//{
-//	auto p = lua::toResFX(L, 1);
-//	if (!p)
-//		return luaL_error(L, "can't find effect");
-//	auto blend = TranslateBlendMode(L, 2);
-//	if (lua_gettop(L) >= 3)
-//		lua::setResFX(p, L, 3);
-//	if (!LRR.postEffectApply(p, blend))
-//		return luaL_error(L, "PostEffectApply failed.");
-//	return 0;
-//}
-//static int SetShaderUniform(lua_State* L) noexcept
-//{
-//	auto p = lua::toResFX(L, 1);
-//	if (!p)
-//		return luaL_error(L, "can't find effect");
-//	return lua::setResFX(p, L, 2);
-//}
+
 static int CreateGLProgramFromPath(lua_State* L) noexcept
 {
-	const auto s1 = lua_tostring(L, 1);
-	const auto s2 = lua_tostring(L, 2);
+	const auto s1 = luaL_checkstring(L, 1);
+	const auto s2 = luaL_checkstring(L, 2);
 	const auto p = util::CreateGLProgramFromPath(s1, s2);
 	if (!p)
 		return luaL_error(L, "can't create GLProgram from path [%s] and [%s]", s1, s2);
@@ -170,8 +146,8 @@ static int CreateGLProgramFromPath(lua_State* L) noexcept
 }
 static int CreateGLProgramFromString(lua_State* L) noexcept
 {
-	const auto s1 = lua_tostring(L, 1);
-	const auto s2 = lua_tostring(L, 2);
+	const auto s1 = luaL_checkstring(L, 1);
+	const auto s2 = luaL_checkstring(L, 2);
 	const auto p = util::CreateGLProgramFromString(s1, s2);
 	if (!p)
 		return luaL_error(L, "can't create GLProgram from string");
@@ -182,12 +158,20 @@ static int CreateGLProgramFromString(lua_State* L) noexcept
 static int CopyFrameBuffer(lua_State* L) noexcept
 {
 	const auto p = LRR.copyFrameBuffer();
-	if (!p)
-		return luaL_error(L, "can't create GLProgram from string");
 	object_to_luaval<cocos2d::RenderTexture>(L, "cc.RenderTexture", p);
 	return 1;
 }
-
+static int SetOffscreen(lua_State* L) noexcept
+{
+	LRR.setOffscreen(lua_toboolean(L, 1));
+	return 0;
+}
+static int GetFrameBuffer(lua_State* L) noexcept
+{
+	const auto p = LRR.getFrameBuffer();
+	object_to_luaval<cocos2d::RenderTexture>(L, "cc.RenderTexture", p);
+	return 1;
+}
 
 vector<luaL_Reg> lstg::LW_Graph()
 {
@@ -202,13 +186,12 @@ vector<luaL_Reg> lstg::LW_Graph()
 		{ "PushRenderTarget", &PushRenderTarget },
 		{ "PopRenderTarget", &PopRenderTarget },
 		{ "PostEffect", &PostEffect },
-		//{ "PostEffectCapture", &PostEffectCapture },
-		//{ "PostEffectApply", &PostEffectApply },
 
-		//{ "SetShaderUniform", &SetShaderUniform },
 		{ "CreateGLProgramFromPath", &CreateGLProgramFromPath },
 		{ "CreateGLProgramFromString", &CreateGLProgramFromString },
 		{ "CopyFrameBuffer", &CopyFrameBuffer },
+		{ "SetOffscreen", &SetOffscreen },
+		{ "GetFrameBuffer", &GetFrameBuffer },
 	};
 	return ret;
 }

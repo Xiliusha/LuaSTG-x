@@ -60,10 +60,9 @@ void lstg::TranslateAlignMode(lua_State* L, int argnum, TextHAlignment& halign, 
 
 void lstg::RegistWrapper(lua_State* L)
 {
-	ColorWrapper::Register(L);  // 颜色对象
-	RandomizerWrapper::Register(L);  // 随机数发生器
-	//BentLaserDataWrapper::Register(L);  // 曲线激光
-	BuiltInFunctionWrapper::Register(L);  // 内建函数库
+	ColorWrapper::Register(L);
+	RandomizerWrapper::Register(L);
+	BuiltInFunctionWrapper::Register(L);
 
 	EXWrapper::Register(L);
 
@@ -158,6 +157,26 @@ return function(size)
     return cast(_arr_t, ptr)
 end
 )__";
+	// number value from cdata
+	ffi_func["ffi.cast_uint64"] = R"__(
+local ffi = require('ffi')
+local store = ffi.new('uint64_t[1]')
+local ptr = ffi.cast('uint64_t*', store)
+return function(value)
+	store[0] = value
+    return ptr
+end
+)__";
+	ffi_func["ffi.cast_int64"] = R"__(
+local ffi = require('ffi')
+local store = ffi.new('int64_t[1]')
+local ptr = ffi.cast('int64_t*', store)
+return function(value)
+	store[0] = value
+    return ptr
+end
+)__";
+
 	for(auto& it : ffi_func)
 	{
 		if (luaL_dostring(L, it.second.c_str()) == 0)

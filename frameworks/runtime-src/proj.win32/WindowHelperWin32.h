@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "../fcyLib/fcyMath.h"
 #include "../Classes/Classes/WindowHelper.h"
 
 namespace lstg
@@ -68,10 +67,10 @@ namespace lstg
 		int SetCaption(const wchar_t* Caption);
 		bool GetVisiable();
 		int SetVisiable(bool Visiable);
-		fcyRect GetRect();
-		int SetRect(const fcyRect& Range);
-		fcyRect GetClientRect();
-		int SetClientRect(const fcyRect& Range);
+		cocos2d::Rect GetRect();
+		int SetRect(const cocos2d::Rect& Range);
+		cocos2d::Rect GetClientRect();
+		int SetClientRect(const cocos2d::Rect& Range);
 		bool IsTopMost();
 		int SetTopMost(bool TopMost);
 		void HideMouse(bool bShow);
@@ -101,10 +100,6 @@ namespace lstg
 			else
 				return m_IMECandidateList[Index].c_str();
 		}
-
-		//void setTitle(const char* s) override;
-		//void setPosition(const cocos2d::Vec2& p) override;
-		//void setVisible(bool b) override;
 
 		static void setCloseNotify(bool notify);
 		static void setCloseNotifyInfo(const std::string& caption, const std::string& text);

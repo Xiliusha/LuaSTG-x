@@ -14,7 +14,6 @@
 #include "InputManager.h"
 #include "WindowHelper.h"
 #include <memory>
-//#include "CollisionDetect.h"
 #include "XLive2D.h"
 #include "lua_x_L2D_auto.hpp"
 #include "../LuaBindings/lua_Resource_auto.hpp"
@@ -27,18 +26,36 @@
 #include "../LuaBindings/lua_FileDialog_auto.hpp"
 #include "../LuaBindings/lua_ParticlePool_auto.hpp"
 #include "../LuaBindings/lua_ResourceMgr_auto.hpp"
-#include "../LuaBindings/lua_XTriangles_auto.hpp"
+#include "../LuaBindings/lua_Triangles_auto.hpp"
+#include "../LuaBindings/lua_Buffer_auto.hpp"
+#include "../LuaBindings/lua_Stream_auto.hpp"
+#include "../LuaBindings/lua_cc_ui_fix.h"
 #if (CC_TARGET_PLATFORM != CC_PLATFORM_ANDROID) && (CC_TARGET_PLATFORM != CC_PLATFORM_IOS)
 #include "../LuaBindings/lua_cc_controller_auto.hpp"
 #include "../LuaBindings/lua_cc_controller_manual.hpp"
 #endif
+#include "lptree.h"
+
+#ifdef CC_PLATFORM_PC
+#include "../imgui/lua-bindings/imgui_lua.hpp"
+#endif // CC_PLATFORM_PC
+
 #include "UtilLua.h"
+#include <iostream>
 
 #if CC_TARGET_PLATFORM == CC_PLATFORM_WIN32
 #include "../../proj.win32/SimulatorWin.h"
 #include "../../proj.win32/WindowHelperWin32.h"
+extern "C"
+{
+	// Prefer the higher performance GPU on Windows systems that use nvidia Optimus.
+	// http://developer.download.nvidia.com/devzone/devcenter/gamegraphics/files/OptimusRenderingPolicies.pdf
+	_declspec(dllexport) DWORD NvOptimusEnablement = 1;
+	// Same with AMD GPUs.
+	// https://community.amd.com/thread/169965
+	_declspec(dllexport) DWORD AmdPowerXpressRequestHighPerformance = 1;
+}
 #endif
-#include <iostream>
 
 #ifdef max
 #undef max
@@ -91,7 +108,6 @@ void AppFrame::destroyInstance()
 
 void AppFrame::initGLContextAttrs()
 {
-	//glfwWindowHint(GLFW_SAMPLES, m_AALevel);
 	// set OpenGL context attributes: red,green,blue,alpha,depth,stencil,msaa
 	GLContextAttrs glContextAttrs = { 8, 8, 8, 8, 24, 8, 0 };//TODO: AALevel
 	GLView::setGLContextAttrs(glContextAttrs);
@@ -104,12 +120,11 @@ static int register_all_packages()
 }
 bool AppFrame::applicationDidFinishLaunching()
 {
-	CCLOG("applicationDidFinishLaunching");
 	auto t = ::time(nullptr);
 	char tmp[32];
 	::strftime(tmp, sizeof(tmp), "%H:%M:%S", ::localtime(&t));
 	LINFO("=== AppFrame start at: %s ===", tmp);
-	// set default FPS
+	// default FPS is set in lua
 	//Director::getInstance()->setAnimationInterval(1.0 / 60.0f);
 #if CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID
 	XFileUtils::start();
@@ -143,20 +158,33 @@ bool AppFrame::applicationDidFinishLaunching()
 	register_all_x_WindowHelper(L);
 	register_all_x_FileDialog(L);
 	register_all_x_ResourceMgr(L);
-	register_all_x_XTriangles(L);
+	register_all_x_Triangles(L);
+	register_all_x_Buffer(L);
+	register_all_x_Stream(L);
+	register_all_cocos2dx_ui_fix(L);
+#ifdef CC_PLATFORM_PC
+	luaopen_imgui(L);
+#endif // CC_PLATFORM_PC
 
 	register_all_packages();
 	stack->setXXTEAKeyAndSign("2dxLua", strlen("2dxLua"), "XXTEA", strlen("XXTEA"));
 	luaopen_lfs(L);
+	luaopen_lpeg(L);
 	RegistWrapper(L);
-	//luaopen_libeffil(L);
-	//lua_setglobal(L, "effil");
-	//lua_settop(L, 0);
 
 	InitGameObjectPropertyHash();
 	CC_SAFE_DELETE(threadPool);
+	// note: on android, this is the number of currently activated cores
 	const int nThr = std::thread::hardware_concurrency();
-	threadPool = new XThreadPool(std::max(1, std::min(nThr - 1, 3)));
+	threadPool = new ThreadPool(std::max(1, std::min(nThr - 1, 3)));
+	if (nThr > 0)
+	{
+		LINFO("ThreadPool size: %d (core count: %d)", threadPool->size(), nThr);
+	}
+	else
+	{
+		LINFO("ThreadPool size: %d", threadPool->size());
+	}
 
 	auto FU = FileUtils::getInstance();
 	FU->addSearchPath("src");
@@ -214,28 +242,6 @@ void AppFrame::ShowSplashWindow(const char* imgPath)noexcept
 	{
 #ifdef CC_PLATFORM_PC
 		//TODO:
-		//try
-		//{
-		//	Gdiplus::Image* pImg = nullptr;
-		//	// 若有图片，则加载
-		//	if (imgPath)
-		//	{
-		//		fcyRefPointer<fcyMemStream> tDataBuf;
-		//		if (m_LRES.LoadFile(imgPath, tDataBuf))
-		//			pImg = SplashWindow::LoadImageFromMemory((fcData)tDataBuf->GetInternalBuffer(), (size_t)tDataBuf->GetLength());
-		//		
-		//		if (!pImg)
-		//			LERROR("ShowSplashWindow: 无法加载图片'%s'", imgPath);
-		//	}
-		//	// 显示窗口
-		//	m_SplashWindow.ShowSplashWindow(pImg);
-		//	FCYSAFEDEL(pImg);
-		//}
-		//catch (const bad_alloc&)
-		//{
-		//	LERROR("ShowSplashWindow: OOM");
-		//	return;
-		//}
 #endif
 		optSplashWindow = true;
 	}
@@ -243,28 +249,22 @@ void AppFrame::ShowSplashWindow(const char* imgPath)noexcept
 		LWARNING("ShowSplashWindow: can't load at this moment");
 }
 
-void AppFrame::SetWindowed(bool v)noexcept
-{
-	//if (optWindowed == v)return;
-	//optWindowed = v;
-}
-
-void AppFrame::SetFPS(uint32_t v) noexcept
+void AppFrame::setFPS(uint32_t v) noexcept
 {
 	targetFPS = v;
 	Director::getInstance()->setAnimationInterval(1.0 / v);
 }
 
-double AppFrame::GetFPS() noexcept
+double AppFrame::getFPS() noexcept
 {
 	// TODO: Smooth
 	return Director::getInstance()->getFrameRate();
 }
 
-void AppFrame::LoadScript(const char* path)noexcept
+void AppFrame::loadScript(const char* path)noexcept
 {
 	string err;
-	auto data = LRES.getDataFromFile(path);
+	auto data = LRES.getBufferFromFile(path);
 	if (!data)
 	{
 		err = string("can't load script [") + path + "]";
@@ -272,12 +272,9 @@ void AppFrame::LoadScript(const char* path)noexcept
 		luaL_error(L, err.c_str());
 		return;
 	}
-	//if (luaL_loadbuffer(L, (const char*)data->getBytes(), (size_t)data->getSize(), luaL_checkstring(L, 1)))
-	//string s = "--[[" + string(path) + "]]";
-	auto s = string((const char*)data->getBytes(), (size_t)data->getSize());
-	// TODO: Check
-	//if ((luaL_loadstring(L, s.c_str()) || lua_pcall(L, 0, LUA_MULTRET, 0)))// this will return the result
-	if (luaL_loadbuffer(L, (const char*)data->getBytes(), (size_t)data->getSize(), luaL_checkstring(L, 1))
+	// LUA_MULTRET will return the result
+	//if ((luaL_loadstring(L, s.c_str()) || lua_pcall(L, 0, LUA_MULTRET, 0)))
+	if (luaL_loadbuffer(L, (const char*)data->data(), (size_t)data->size(), luaL_checkstring(L, 1))
 		|| lua_pcall(L, 0, LUA_MULTRET, 0))
 	{
 		err = string("failed to compile [") + string(path) + "]:\n" + string(lua_tostring(L, -1));
@@ -286,9 +283,16 @@ void AppFrame::LoadScript(const char* path)noexcept
 	}
 }
 
-void AppFrame::SnapShot(const char* path)noexcept
+void AppFrame::snapShot(const char* path)noexcept
 {
 	utils::captureScreen(nullptr, path);//TODO: CHECK
+}
+
+ThreadPool* AppFrame::getThreadPool() noexcept
+{
+	if (!threadPool)
+		threadPool = new ThreadPool{ 0 };
+	return threadPool;
 }
 
 bool AppFrame::Init()noexcept
@@ -305,7 +309,7 @@ bool AppFrame::Init()noexcept
 	LINFO("initializing GameObjectPool (%u)", LGOBJ_MAXCNT);
 	try
 	{
-		gameObjectPool = make_unique<GameObjectPool>(L);
+        gameObjectPool = std::unique_ptr<GameObjectManager>(new GameObjectManager(L));
 	}
 	catch (const bad_alloc&)
 	{
@@ -323,7 +327,6 @@ bool AppFrame::Init()noexcept
 #elif CC_TARGET_PLATFORM == CC_PLATFORM_LINUX
 #endif
 #ifdef CC_PLATFORM_PC
-	//WindowHelperDesktop::getInstance()->moveToCenter();
 	WindowHelperDesktop::getInstance()->setTitle("LuaSTG-x");
 #endif
 
@@ -436,8 +439,7 @@ bool AppFrame::Reset()noexcept
 
 	gameObjectPool->ResetPool();
 	LINFO("clear GameObjectPool");
-	//m_LRES.UnloadAllPack();
-	//LINFO("unload all packs"");
+
 	L = LuaEngine::getInstance()->getLuaStack()->getLuaState();
 	gameObjectPool->ResetLua(L);
 	XAudioEngine::stopAll();
@@ -523,6 +525,7 @@ int AppFrame::run()
 	auto e = director->getEventDispatcher();
 	const auto listener = EventListenerCustom::create(Director::EVENT_AFTER_DRAW, [&](EventCustom* event)
 	{
+		// there will be strange frame drop on screen without this, although frame time is steady
 		glFinish();
 
 		//if (glview->windowShouldClose())
@@ -583,15 +586,12 @@ int AppFrame::run()
 		}
 
 		wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
-		// note: Sleep here to make swapbuffer steady?
+		// Sleep here to make swapbuffer steady?
 		//Sleep(1);
 	});
 	e->addEventListenerWithFixedPriority(listener, 9);
-	//e->addEventListenerWithFixedPriority(EventListenerCustom::create(Director::EVENT_AFTER_DRAW,[&](EventCustom* event)
-	//{
-	//	wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE);
-	//}), 9);
-	const auto listener2 = EventListenerCustom::create(Director::EVENT_BEFORE_UPDATE, [&](EventCustom* event)
+	const auto listener2 = EventListenerCustom::create(
+		Director::EVENT_BEFORE_UPDATE, [&](EventCustom* event)
 	{
 		XProfiler::getInstance()->toc("pullEvents");
 	});

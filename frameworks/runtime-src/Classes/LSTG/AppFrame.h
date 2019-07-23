@@ -1,16 +1,16 @@
 ﻿#pragma once
 #include "Global.h"
 #include "ResourceMgr.h"
-#include "GameObjectPool.h"
+#include "GameObjectManager.h"
 #include "MemPoolManager.h"
 #include "XThreadPool.hpp"
 
 // LSTG AppFrame
 #define LAPP (*lstg::AppFrame::getInstance())
 // LSTG GameObjectPool
-#define LPOOL (LAPP.GetGameObjectPool())
+#define LPOOL (LAPP.getGameObjectPool())
 // LSTG ThreadPool
-#define LTHP (*LAPP.GetThreadPool())
+#define LTHP (*LAPP.getThreadPool())
 
 namespace lstg
 {
@@ -48,32 +48,31 @@ namespace lstg
 	private:
 		Status status = Status::NotInitialized;
 
-		std::unique_ptr<GameObjectPool> gameObjectPool;
+		std::unique_ptr<GameObjectManager> gameObjectPool;
 		lua_State* L = nullptr;
 
 		bool optSplashWindow = false;
 		double targetFPS = 0.;
 		uint32_t dropCounter = 0;
 
-		XThreadPool* threadPool = nullptr;
+		ThreadPool* threadPool = nullptr;
 
 	public:
-		void SetWindowed(bool v)noexcept;
 		void ShowSplashWindow(const char* imgPath = nullptr)noexcept; //TODO: remove?
 
-		void SetFPS(uint32_t v)noexcept;
-		double GetTargetFPS() const noexcept { return targetFPS; }
-		double GetFPS() noexcept;
+		void setFPS(uint32_t v)noexcept;
+		double getTargetFPS() const noexcept { return targetFPS; }
+		double getFPS() noexcept;
 
-		void LoadScript(const char* path)noexcept;
+		void loadScript(const char* path)noexcept;
 
-		void SnapShot(const char* path)noexcept;
+		void snapShot(const char* path)noexcept;
 	public:
-		GameObjectPool& GetGameObjectPool() const noexcept { return *gameObjectPool; }
-		XThreadPool* GetThreadPool() const noexcept { return threadPool; }
+		GameObjectManager& getGameObjectPool() const noexcept { return *gameObjectPool; }
+		ThreadPool* getThreadPool() noexcept;
 
-		uint32_t GetDropCounter() const { return dropCounter; }
-		void SetDropCounter(uint32_t v) { dropCounter = v; }
+		uint32_t getDropCounter() const { return dropCounter; }
+		void setDropCounter(uint32_t v) { dropCounter = v; }
 
 		bool Init()noexcept;
 		void Shutdown()noexcept;

@@ -1,15 +1,8 @@
 ﻿#pragma once
 #include "cocos2d.h"
-#include "GameObjectPool.h"
+#include "GameObject.h"
 #include "GameObjectPropertyHash.h"
 #include <functional>
-
-//#define GEN_OP_FUNC(_F) static Number* _F(Number* op){\
-//	if(!op)return nullptr;\
-//	return create([o = op->_eval]() { return std::_F(o()); });}
-//#define GEN_OP_FUNC2(_F) static Number* _F(Number* op1, Number* op2){\
-//	if(!op1||!op2)return nullptr;\
-//	return create([o1 = op1->_eval, o2 = op2->_eval]() { return std::_F(o1(), o2()); });}
 
 #define DEF_OP_NUMBER1(name, _f) Operator::regist(name, 1, 1, ComputeNode::Type::Number, [](Operator* op){\
 	const auto op1 = op->inputs.at(0)->getNumber();\
@@ -31,12 +24,9 @@ namespace lstg
 {
 	struct GameObject;
 	class GameClass;
+
 	namespace symbol
 	{
-		//class Number;
-		//class Boolean;
-		//class Operand;
-
 		class ComputeNode : public cocos2d::Ref
 		{
 		public:

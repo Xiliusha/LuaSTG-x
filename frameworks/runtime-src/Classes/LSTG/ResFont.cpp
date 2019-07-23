@@ -3,6 +3,7 @@
 #include "Utility.h"
 #include "XFileUtils.h"
 #include "AppFrame.h"
+#include "../fcyLib/fcyMisc/fcyStringHelper.h"
 
 using namespace std;
 using namespace cocos2d;
@@ -206,17 +207,11 @@ ResFont::~ResFont()
 
 ResFont* ResFont::createHGE(const std::string& name, const std::string& path)
 {
-	const auto data = LRES.getDataFromFile(path);
-	if (!data)
+	if (!FileUtils::getInstance()->isFileExist(path))
 		return nullptr;
-	//Data tDataBuf;
-	//if (!LRES.LoadFile(path, &tDataBuf))
-	//	return nullptr;
 	try
 	{
-		const string fData = string(
-			reinterpret_cast<const char*>(data->getBytes()),
-			static_cast<size_t>(data->getSize()));
+		const string fData = LRES.getStringFromFile(path);
 		auto pos = path.find_last_of('/');
 		if (pos == string::npos)
 			pos = path.find_last_of('\\');
@@ -239,6 +234,7 @@ ResFont* ResFont::createHGE(const std::string& name, const std::string& path)
 		if (!res)
 			return nullptr;
 		res->getTTFConfig().fontFilePath = font_path;
+		res->resPath = font_path;
 		return res;
 	}
 	catch (...){}
@@ -257,6 +253,7 @@ ResFont* ResFont::createBMF(const std::string& name, const std::string& path)
 		if (!res)
 			return nullptr;
 		res->getTTFConfig().fontFilePath = font_path;
+		res->resPath = font_path;
 		return res;
 	}
 	catch (...){}

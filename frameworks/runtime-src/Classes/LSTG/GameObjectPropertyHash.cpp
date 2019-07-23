@@ -1,9 +1,14 @@
 ﻿#include "GameObjectPropertyHash.h"
 #include "cocos2d.h"
 #include "scripting/lua-bindings/manual/CCLuaEngine.h"
-//#include "fcyLib/fcyMisc/fcyStopWatch.h"
-#include "LogSystem.h"
 #include <unordered_map>
+
+#include "platform/CCPlatformMacros.h"
+#if CC_64BITS
+#define HASH_OFFSET -3
+#else
+#define HASH_OFFSET -2
+#endif
 
 using namespace std;
 using namespace lstg;
@@ -62,7 +67,7 @@ void lstg::InitGameObjectPropertyHash()
 	for (auto it : prop_map)
 	{
 		lua_pushstring(L, it.first.c_str());
-		const auto hash = ((uint32_t*)lua_tolstring(L, -1, nullptr))[-2];
+		const auto hash = ((uint32_t*)lua_tolstring(L, -1, nullptr))[HASH_OFFSET];
 		lua_pop(L, 1);
 		prop_hash_map[hash] = it.second;
 	}
@@ -70,7 +75,7 @@ void lstg::InitGameObjectPropertyHash()
 
 GameObjectProperty lstg::GameObjectPropertyHash(const char* key)
 {
-	const auto hash = ((uint32_t*)key)[-2];
+	const auto hash = ((uint32_t*)key)[HASH_OFFSET];
 	const auto it = prop_hash_map.find(hash);
 	if (it != prop_hash_map.end())
 		return it->second;
@@ -83,7 +88,7 @@ GameObjectProperty lstg::GameObjectPropertyHash(lua_State* L, int lo, const char
 	if (str)
 		*str = s;
 	// hack into lua
-	const auto hash = ((uint32_t*)s)[-2];
+	const auto hash = ((uint32_t*)s)[HASH_OFFSET];
 	const auto it = prop_hash_map.find(hash);
 	if (it != prop_hash_map.end())
 		return it->second;

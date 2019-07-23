@@ -2,7 +2,6 @@
 #include "AppFrame.h"
 #include "LWColor.h"
 #include "LWRandomizer.h"
-#include "GameObjectBentLaser.h"
 
 #include "LW_Audio.h"
 #include "LW_Frame.h"
@@ -33,12 +32,11 @@ void BuiltInFunctionWrapper::Register(lua_State* L)
 	for(auto& lw : lw_base)
 		functions.insert(functions.end(), lw.begin(), lw.end());
 
-	// 杂项
 	struct Misc
 	{
 		static int Snapshot(lua_State* L) noexcept
 		{
-			LAPP.SnapShot(luaL_checkstring(L, 1));
+			LAPP.snapShot(luaL_checkstring(L, 1));
 			return 0;
 		}
 		static int Execute(lua_State* L) noexcept
@@ -47,7 +45,6 @@ void BuiltInFunctionWrapper::Register(lua_State* L)
 		}
 	};
 
-	// 调试函数
 	struct Debug
 	{
 		static int ObjTable(lua_State* L) noexcept
@@ -56,7 +53,6 @@ void BuiltInFunctionWrapper::Register(lua_State* L)
 		}
 	};
 
-	// 对象构造函数
 	struct Constructor
 	{
 		static int NewColor(lua_State* L) noexcept
@@ -89,11 +85,6 @@ void BuiltInFunctionWrapper::Register(lua_State* L)
 			RandomizerWrapper::CreateAndPush(L);
 			return 1;
 		}
-		//static int BentLaserData(lua_State* L) noexcept
-		//{
-		//	GameObjectBentLaser::CreateAndPush(L);
-		//	return 1;
-		//}
 	};
 
 	struct Deprecated
@@ -118,7 +109,6 @@ void BuiltInFunctionWrapper::Register(lua_State* L)
 		{ "ObjTable", &Debug::ObjTable },
 		{ "Color", &Constructor::NewColor },
 		{ "Rand", &Constructor::NewRand },
-		//{ "BentLaserData", &Constructor::BentLaserData },
 		{ "UpdateObjList", &Deprecated::UpdateObjList },
 		{ "RegTTF", &Deprecated::RegTTF },
 		{ "UpdateSound", &Deprecated::UpdateSound },

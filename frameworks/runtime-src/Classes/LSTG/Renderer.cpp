@@ -7,6 +7,7 @@
 #include <EGL/egl.h>
 #endif
 
+#define BATCH_COMMAND
 #define MT_UpdateVerts
 
 using namespace std;
@@ -194,6 +195,13 @@ void XRenderer::setVsync(bool v)noexcept
 	}
 }
 
+void XRenderer::setOffscreen(bool b) noexcept
+{
+	bOffscreen = b;
+	if (b)
+		bUseFrameBuffer = true;
+}
+
 void XRenderer::pushCustomCommend(function<void()> f)noexcept
 {
 	auto cmd = LMP.getCustomCommand();
@@ -231,6 +239,18 @@ void XRenderer::pushCustomCommend(RenderQueue::QUEUE_GROUP group, float globalZO
 		default: ;
 	}
 	addCommand(cmd);
+}
+
+void XRenderer::pushDummyCommand() noexcept
+{
+	// workaround for XTrianglesCommand::useMaterial, and will make label support blend equation
+	auto dummy = LMP.getXTrianglesCommand();
+	dummy->init(0.f, nullptr, currentBlendMode->getGLProgramState(),
+		currentBlendMode->blendFunc, currentBlendMode->blendEquation);
+	const auto tri = dummy->getTri();
+	tri->vertCount = 0;
+	tri->indexCount = 0;
+	addCommand(dummy);
 }
 
 bool XRenderer::beginScene()noexcept
@@ -702,6 +722,10 @@ bool XRenderer::renderText(ResFont* p, const char* str,
 		label->setColor(Color3B(p->getColor()));
 		label->setGLProgram(currentBlendMode->getGLProgram());//don't set fog
 	}
+
+	// workaround, and will make label support blend equation
+	pushDummyCommand();
+
 	label->visit(pRenderer, Mat4::IDENTITY, 0);
 	return true;
 }
@@ -845,12 +869,15 @@ bool XRenderer::postEffect(ResRenderTarget* p, ResFX* shader, BlendMode* blend)n
 
 void XRenderer::addCommand(RenderCommand* cmd)
 {
+#ifdef BATCH_COMMAND
 	flushTriangles();
+#endif
 	pRenderer->addCommand(cmd);
 }
 
 void XRenderer::addXTCommand(XTrianglesCommand* cmd)
 {
+#ifdef BATCH_COMMAND
 	if (triToDraw.empty() || triToDraw.back()->getMaterialID() == cmd->getMaterialID())
 	{
 		// merge
@@ -862,6 +889,9 @@ void XRenderer::addXTCommand(XTrianglesCommand* cmd)
 		flushTriangles();
 		triToDraw.push_back(cmd);
 	}
+#else
+	pRenderer->addCommand(cmd);
+#endif
 }
 
 void XRenderer::flushTriangles()
@@ -966,13 +996,10 @@ void XRenderer::updateBatchedVerts()
 #ifdef MT_UpdateVerts
 	const auto size = batchTaskInfo.size();
 	const auto nThr = LTHP.size() + 1;
-	static atomic<int> flagn;
-	flagn = 0;
-
 	const auto dat = batchTaskInfo.data();
 	const auto vert = _verts.data();
 	const auto cmds = _cmds.data();
-	deployThreadTask(size, nThr, [=](int start, int end)
+	deployThreadTaskAndWait(size, nThr, [=](int start, int end, int)
 	{
 		for (auto j = start; j < end; j++) {
 			const auto& inf = dat[j];
@@ -987,9 +1014,7 @@ void XRenderer::updateBatchedVerts()
 				}
 			}
 		}
-		++flagn;
 	});
-	while (flagn < nThr) {}
 #endif
 }
 
@@ -1064,9 +1089,12 @@ void XRenderer::frameBufferEnd()
 		Director::getInstance()->loadProjectionMatrix(_FBProjection, 0);
 	});
 
-	const auto tsize = frameBuffer->getSprite()->getTexture()->getContentSizeInPixels();
-	const auto scale = min(size.width / tsize.width, size.height / tsize.height);
-	renderFrameBuffer(scale);
+	if (!bOffscreen)
+	{
+		const auto tsize = frameBuffer->getSprite()->getTexture()->getContentSizeInPixels();
+		const auto scale = min(size.width / tsize.width, size.height / tsize.height);
+		renderFrameBuffer(scale);
+	}
 }
 
 void XRenderer::renderFrameBuffer(float scale, bool copy)
@@ -1114,7 +1142,7 @@ RenderTexture* XRenderer::copyFrameBuffer(bool transparent)
 	if (!frameBuffer)
 		return nullptr;
 	auto tmpRT = RenderTexture::create(
-		_lastFBSize.width, _lastFBSize.height,
+		(int)_lastFBSize.width, (int)_lastFBSize.height,
 		Texture2D::PixelFormat::RGBA8888, GL_DEPTH24_STENCIL8);
 	tmpRT->retain();
 	tmpRT->beginWithClear(0, 0, 0, transparent ? 0 : 1);

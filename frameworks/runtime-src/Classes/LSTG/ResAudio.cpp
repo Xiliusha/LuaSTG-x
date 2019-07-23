@@ -1,17 +1,11 @@
 ﻿#include "ResAudio.h"
 #include "../Audio/AudioEngine.h"
-#include "../Audio/AudioDecoderManager.h"
-#include "../Audio/AudioDecoder.h"
+//#include "../Audio/AudioDecoderManager.h"
+//#include "../Audio/AudioDecoder.h"
 #include "LogSystem.h"
-#include "ResAnimation.h"
 #include "AppFrame.h"
 #include "Utility.h"
 #include "Math/XFFT.h"
-
-static float VolumeFix(float v)
-{
-	return -exp(-v * 6.f) + 1;
-}
 
 using namespace std;
 using namespace lstg;
@@ -56,7 +50,7 @@ void ResAudio::play()
 void ResAudio::play(float vol, float pan)
 {
 	param.position.x = pan;
-	param.volume = VolumeFix(vol);
+	param.volume = vol;
 	play();
 }
 
@@ -125,13 +119,16 @@ void ResAudio::setTime(float time)
 
 float ResAudio::getTotalTime()
 {
-	return XAudioEngine::getDuration(audioID);
+	const auto t = XAudioEngine::getDuration(audioID);
+	if (t == XAudioEngine::TIME_UNKNOWN && cache)
+		return cache->getDuration();
+	return t;
 }
 
 void ResAudio::setVolume(float v)
 {
 	param.volume = v;
-	XAudioEngine::setVolume(audioID, VolumeFix(v));
+	XAudioEngine::setVolume(audioID, v);
 }
 
 void ResAudio::setParam(const xAudio::SourceParam& _param)
@@ -311,13 +308,21 @@ bool ResAudio::do_fft()
 	return true;
 }
 
-ResAudio::ResAudio(const std::string& name, ResourceType type, const string& _path, shared_ptr<cocos2d::Data> _data):
+bool ResAudio::init(StreamMemory* _data)
+{
+	if (!_data)
+		return false;
+	stream = _data;
+	stream->retain();
+	param.position.z = -1.f;// note: set this
+	return true;
+}
+
+ResAudio::ResAudio(const std::string& name, ResourceType type, const std::string& _path):
 	Resource(type, name), audioID(XAudioEngine::INVALID_AUDIO_ID)
 {
-	data = _data;
-	stream = fcyMemStream::create(data.get(), data->getSize(), true, false);
 	path = _path;
-	param.position.z = -1.f;// note: set this
+	resPath = _path;
 }
 
 ResAudio::~ResAudio()
@@ -341,28 +346,48 @@ void ResSound::setVolume(float v)
 	ResAudio::setVolume(v);
 }
 
-ResSound::ResSound(const std::string& name, const string& path, shared_ptr<cocos2d::Data> data):
-ResAudio(name, ResourceType::SoundEffect, path, data)
+bool ResSound::initWithBuffer(Buffer* data)
 {
-	XAudioEngine::preload(path, stream, nullptr, &cache);
+	if (!data)
+		return false;
+	const auto memory = StreamMemory::create(data);
+	if(!memory)
+		return false;
+	if (!init(memory))
+		return false;
+	XAudioEngine::preload(path, XAudioStream::create(memory), nullptr, &cache);
 	if (cache)
 		cache->blockToReady();
 	else
-		XINFO("failed to load cache of '%s' at [%s]", name.c_str(), path.c_str());
+	{
+		XINFO("failed to load cache of '%s' at [%s]", getName().c_str(), path.c_str());
+		return false;
+	}
+	return true;
+}
+
+ResSound::ResSound(const std::string& name, const std::string& path) :
+	ResAudio(name, ResourceType::SoundEffect, path)
+{
+}
+
+ResSound::~ResSound()
+{
 }
 
 ResSound* ResSound::create(const std::string& name, const std::string& path)
 {
-	const auto data = LRES.getDataFromFile(path);
+	const auto data = LRES.getBufferFromFile(path);
 	if (!data)
 		return nullptr;
-	auto ret = new (nothrow) ResSound(name, path, data);
-	if (!ret || !ret->getCache() || !ret->getStream())
+	auto ret = new (nothrow) ResSound(name, path);
+	if (ret && ret->initWithBuffer(data))
 	{
-		CC_SAFE_DELETE(ret);
-		return nullptr;
+		//ret->autorelease();
+		return ret;
 	}
-	return ret;
+	CC_SAFE_DELETE(ret);
+	return nullptr;
 }
 
 void ResMusic::play(float vol, float pan)
@@ -375,27 +400,46 @@ void ResMusic::setVolume(float v)
 	ResAudio::setVolume(v);
 }
 
-ResMusic::ResMusic(const std::string& name, const string& path, shared_ptr<cocos2d::Data> data,
-	double loopA, double loopB):
-ResAudio(name, ResourceType::Music, path, data)
+bool ResMusic::initWithBuffer(Buffer* data, double loopA, double loopB)
 {
-	XAudioEngine::preload(path, stream, loopA, loopB, nullptr, &cache);
+	if (!data)
+		return false;
+	const auto memory = StreamMemory::create(data);
+	if (!memory)
+		return false;
+	if (!init(memory))
+		return false;
+	XAudioEngine::preload(path, XAudioStream::create(memory), loopA, loopB, nullptr, &cache);
 	if (cache)
 		cache->blockToReady();
-	//else
-	//	XINFO("failed to load cache of '%s' at [%s]", name.c_str(), path.c_str());
+	else
+	{
+		XINFO("failed to load cache of '%s' at [%s]", getName().c_str(), path.c_str());
+		return false;
+	}
+	return true;
+}
+
+ResMusic::ResMusic(const std::string& name, const std::string& path) :
+	ResAudio(name, ResourceType::Music, path)
+{
+}
+
+ResMusic::~ResMusic()
+{
 }
 
 ResMusic* ResMusic::create(const std::string& name, const std::string& path, double loopStart, double loopEnd)
 {
-	const auto data = LRES.getDataFromFile(path);
+	const auto data = LRES.getBufferFromFile(path);
 	if (!data)
 		return nullptr;
-	auto ret = new (nothrow) ResMusic(name, path, data, loopStart, loopEnd);
-	if (!ret || !ret->getCache() || !ret->getStream())
+	auto ret = new (nothrow) ResMusic(name, path);
+	if (ret && ret->initWithBuffer(data, loopStart, loopEnd))
 	{
-		CC_SAFE_DELETE(ret);
-		return nullptr;
+		//ret->autorelease();
+		return ret;
 	}
-	return ret;
+	CC_SAFE_DELETE(ret);
+	return nullptr;
 }

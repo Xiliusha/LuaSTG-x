@@ -1,6 +1,7 @@
 ﻿#include "ResFX.h"
 #include "AppFrame.h"
 #include "UtilLua.h"
+#include "Utility.h"
 
 using namespace std;
 using namespace cocos2d;
@@ -117,18 +118,17 @@ string ResFX::getInfo() const
 
 ResFX* ResFX::create(const std::string& name, const std::string& vsPath, const std::string& fsPath)
 {
-	const auto vsDataBuf = LRES.getDataFromFile(vsPath);
-	if (!vsDataBuf || vsDataBuf->getSize() == 0)
+	const auto vs = LRES.getStringFromFile(vsPath);
+	const auto fs = LRES.getStringFromFile(fsPath);
+	if (vs.empty() && fs.empty())
 		return nullptr;
-	const auto fsDataBuf = LRES.getDataFromFile(fsPath);
-	if (!fsDataBuf || fsDataBuf->getSize() == 0)
-		return nullptr;
-	const auto glProgram = util::CreateGLProgramFromString(
-		string((char*)vsDataBuf->getBytes(), vsDataBuf->getSize()),
-		string((char*)fsDataBuf->getBytes(), fsDataBuf->getSize()));
+	const auto glProgram = util::CreateGLProgramFromString(vs, fs);
 	if (!glProgram)
 		return nullptr;
-	return createWithGLProgram(name, glProgram);
+	auto ret = createWithGLProgram(name, glProgram);
+	if (ret)
+		ret->resPath = fsPath;
+	return ret;
 }
 
 ResFX* ResFX::createWithGLProgram(const std::string& name, cocos2d::GLProgram* glProgram)

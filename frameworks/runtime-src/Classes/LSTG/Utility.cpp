@@ -1,6 +1,7 @@
 ﻿#include "Utility.h"
 #include "UtilGLDefinition.h"
 #include "AppFrame.h"
+#include "../fcyLib/fcyMisc/fcyStringHelper.h"
 
 using namespace std;
 using namespace lstg;
@@ -111,146 +112,35 @@ string lstg::StringFormatV(const char* Format, va_list vaptr)noexcept
 	return tRet;
 }
 
-wstring lstg::StringFormat(const wchar_t* Format, ...)noexcept
+std::string lstg::stackDump(lua_State *L)
 {
-	va_list vaptr;
-	va_start(vaptr, Format);
-	wstring tRet = StringFormatV(Format, vaptr);
-	va_end(vaptr);
-	return tRet;
-}
-
-wstring lstg::StringFormatV(const wchar_t* Format, va_list vaptr)noexcept
-{
-	wstring tRet;
-	try
-	{
-		while (*Format != L'\0')
-		{
-			wchar_t c = *Format;
-			if (c != L'%')
-				tRet.push_back(c);
-			else
-			{
-				c = *(++Format);
-
-				switch (c)
-				{
-				case L'%':
-					tRet.push_back(L'%');
-					break;
-				case 'b':
-					tRet.append(va_arg(vaptr, bool) ? L"true" : L"false");
-					break;
-				case L'd':
-					tRet.append(to_wstring(va_arg(vaptr, int32_t)));
-					break;
-				case L'f':
-					tRet.append(to_wstring(va_arg(vaptr, double)));
-					break;
-				case L'l':
-					c = *(++Format);
-					switch (c)
-					{
-					case L'f':
-						tRet.append(to_wstring(va_arg(vaptr, double)));
-						break;
-					case L'd':
-						tRet.append(to_wstring(va_arg(vaptr, int64_t)));
-						break;
-					case L'u':
-						tRet.append(to_wstring(va_arg(vaptr, uint64_t)));
-						break;
-					default:
-						tRet.append(L"%l");
-						if (c == L'\0')
-							Format--;
-						else
-							tRet.push_back(c);
-						break;
-					}
-					break;
-				case L'u':
-					tRet.append(to_wstring(va_arg(vaptr, uint32_t)));
-					break;
-				case L'p':
-					tRet.append(to_wstring(va_arg(vaptr, unsigned int)));
-					break;
-				case L'c':
-					tRet.push_back(va_arg(vaptr, int32_t));
-					break;
-				case L's':
-					{
-						const wchar_t* p = va_arg(vaptr, wchar_t*);
-						if (p)
-							tRet.append(p);
-						else
-							tRet.append(L"<null>");
-					}
-					break;
-				case 'm':
-					{
-						const char* p = va_arg(vaptr, char*);
-						if (p)
-							tRet.append(move(fcyStringHelper::MultiByteToWideChar_UTF8(p)));
-						else
-							tRet.append(L"<null>");
-					}
-					break;
-				default:
-					tRet.push_back(L'%');
-					if (c == L'\0')
-						Format--;
-					else
-						tRet.push_back(c);
-					break;
-				}
-			}
-			Format++;
-		}
-	}
-	catch (const bad_alloc&)
-	{
-	}
-
-	return move(tRet);
-}
-
-void lstg::stackDump(lua_State *L) {
-	int i;
-	int top = lua_gettop(L);
-	string s = "\n";
-	for (i = 1; i <= top; i++) {
+	const auto top = lua_gettop(L);
+	string s;
+	for (auto i = 1; i <= top; i++) {
 		s += "[" + to_string(i) + "] = ";
-		int t = lua_type(L, i);
+		const auto t = lua_type(L, i);
 		switch (t) {
-
 		case LUA_TSTRING:
 			s += "\'";
 			s += lua_tostring(L, i);
 			s += "\'";
 			break;
-
 		case LUA_TBOOLEAN:
 			if (lua_toboolean(L, i))
-			{
 				s += "true";
-			}
-			else { s += "false"; }
+			else
+				s += "false";
 			break;
-
 		case LUA_TNUMBER:
 			s += to_string(lua_tonumber(L, i));
 			break;
-
 		default:
 			s += lua_typename(L, t);
 			break;
-
 		}
 		s += "\n";
 	}
-	LINFO("=== Lua Stack Dump ===\n%s", s.c_str());
+	return s;
 }
 
 string lstg::ReplacePathSep(string path, const string& ori, const string& dst)
@@ -476,7 +366,7 @@ void lstg::getNodeTransform(const Vec2& anchorPointInPoints,
 	}
 	else
 	{
-		const float halfRadz = -(rot * .5f * 0.01745329252f);
+		const float halfRadz = -(.5f * 0.01745329252f * rot);
 		const float qz = std::sin(halfRadz);
 		const float qw = std::cos(halfRadz);
 		const float z2 = qz + qz;
@@ -484,13 +374,13 @@ void lstg::getNodeTransform(const Vec2& anchorPointInPoints,
 		wz2 = qw * z2;
 	}
 
-	_transform->m[0] = zz2_;
-	_transform->m[1] = wz2;
+	_transform->m[0] = zz2_ * hscale;
+	_transform->m[1] = wz2 * hscale;
 	_transform->m[2] = 0.0f;
 	_transform->m[3] = 0.0f;
 
-	_transform->m[4] = -wz2;
-	_transform->m[5] = zz2_;
+	_transform->m[4] = -wz2 * vscale;
+	_transform->m[5] = zz2_ * vscale;
 	_transform->m[6] = 0.0f;
 	_transform->m[7] = 0.0f;
 
@@ -499,33 +389,11 @@ void lstg::getNodeTransform(const Vec2& anchorPointInPoints,
 	_transform->m[10] = 1.0f;
 	_transform->m[11] = 0.0f;
 
-	_transform->m[12] = x;
-	_transform->m[13] = y;
+	// assert that most anchor points are not 0 (usually center)
+	_transform->m[12] = x - _transform->m[0] * anchorPointInPoints.x - _transform->m[4] * anchorPointInPoints.y;
+	_transform->m[13] = y - _transform->m[1] * anchorPointInPoints.x - _transform->m[5] * anchorPointInPoints.y;
 	_transform->m[14] = z;
 	_transform->m[15] = 1.0f;
-
-	// note that m[2] and m[6] are 0
-	if (hscale != 1.f)
-	{
-		_transform->m[0] *= hscale;
-		_transform->m[1] *= hscale;
-		//_transform->m[2] *= hscale;
-	}
-	if (vscale != 1.f)
-	{
-		_transform->m[4] *= vscale;
-		_transform->m[5] *= vscale;
-		//_transform->m[6] *= vscale;
-	}
-	// assert that most anchor points are not 0 (usually center)
-	//if (!anchorPointInPoints.isZero())
-	//{
-		//_transform->m[12] += _transform->m[0] * -anchorPointInPoints.x + _transform->m[4] * -anchorPointInPoints.y;
-		//_transform->m[13] += _transform->m[1] * -anchorPointInPoints.x + _transform->m[5] * -anchorPointInPoints.y;
-		//_transform->m[14] += _transform->m[2] * -anchorPointInPoints.x + _transform->m[6] * -anchorPointInPoints.y;
-		_transform->m[12] -= _transform->m[0] * anchorPointInPoints.x + _transform->m[4] * anchorPointInPoints.y;
-		_transform->m[13] -= _transform->m[1] * anchorPointInPoints.x + _transform->m[5] * anchorPointInPoints.y;
-	//}
 }
 
 Mat4 lstg::getNodeTransform(const Vec2& anchorPointInPoints,
@@ -777,27 +645,6 @@ Image* lstg::GetTextureImage(Texture2D* texture, bool flipImage)
 	return image;
 }
 
-void lstg::deployThreadTask(size_t taskSize, size_t nSlice, const std::function<void(int, int)>& task)
-{
-	const auto nThr = nSlice;
-	const int num = taskSize / nThr;
-	for (auto i = 0u; i < nThr; ++i)
-	{
-		const auto start = i * num;
-		auto end = (i + 1)*num;
-		if (i == nThr - 1)
-			end = taskSize;
-		auto task_ = [=]()
-		{
-			task(start, end);
-		};
-		if (i == nThr - 1) // reserve one job for this thread
-			task_();
-		else
-			LTHP.addTask(task_);
-	}
-}
-
 void lstg::deployThreadTask(size_t taskSize, size_t nSlice, const std::function<void(int, int, int)>& task)
 {
 	const auto nThr = nSlice;
@@ -815,24 +662,72 @@ void lstg::deployThreadTask(size_t taskSize, size_t nSlice, const std::function<
 		if (i == nThr - 1) // reserve one job for this thread
 			task_();
 		else
-			LTHP.addTask(task_);
+			LTHP.add_task(task_);
 	}
+}
+
+void lstg::deployThreadTaskAndWait(size_t taskSize, size_t nSlice, const std::function<void(int, int, int)>& task)
+{
+	const auto nThr = nSlice;
+	const int num = taskSize / nThr;
+	vector<future<void>> futures;
+	for (auto i = 0u; i < nThr; ++i)
+	{
+		const auto start = i * num;
+		auto end = (i + 1)*num;
+		if (i == nThr - 1)
+			end = taskSize;
+		auto task_ = [=]()
+		{
+			task(start, end, i);
+		};
+		if (i == nThr - 1) // reserve one job for this thread
+			task_();
+		else
+			futures.emplace_back(LTHP.add_task_future(task_));
+	}
+	for (auto& fu : futures)
+		fu.get();
+}
+
+std::vector<std::future<std::shared_ptr<void>>> lstg::deployThreadTaskFuture(size_t taskSize, size_t nSlice,
+	const std::function<std::shared_ptr<void>(int, int, int)>& task)
+{
+	const auto nThr = nSlice;
+	const int num = taskSize / nThr;
+	vector<future<shared_ptr<void>>> futures;
+	for (auto i = 0u; i < nThr; ++i)
+	{
+		const auto start = i * num;
+		auto end = (i + 1)*num;
+		if (i == nThr - 1)
+			end = taskSize;
+		std::function<shared_ptr<void>()> task_ = [=]()
+		{
+			return task(start, end, i);
+		};
+		if (i == nThr - 1) // reserve one job for this thread
+		{
+			packaged_task<shared_ptr<void>()> _task(task_);
+			futures.emplace_back(_task.get_future());
+			_task();
+		}
+		else
+			futures.emplace_back(LTHP.add_task_future(task_));
+	}
+	return futures;
 }
 
 void RC4::operator()(const uint8_t* input, size_t inputlen, uint8_t* output)
 {
 	uint8_t Scpy[256];
 	memcpy(Scpy, S, sizeof(S));
-
 	for (size_t i = 0, j = 0; i < inputlen; i++)
 	{
-		// S盒置换
-		size_t i2 = (i + 1) % 256;
+		const size_t i2 = (i + 1) % 256;
 		j = (j + Scpy[i2]) % 256;
 		swap(Scpy[i2], Scpy[j]);
-		uint8_t n = Scpy[(Scpy[i2] + Scpy[j]) % 256];
-
-		// 加解密
+		const uint8_t n = Scpy[(Scpy[i2] + Scpy[j]) % 256];
 		*(output + i) = *(input + i) ^ n;
 	}
 }
@@ -840,12 +735,8 @@ void RC4::operator()(const uint8_t* input, size_t inputlen, uint8_t* output)
 RC4::RC4(const uint8_t* password, size_t len)
 {
 	len = min(len, size_t(256));
-
-	// 初始化S盒
 	for (int i = 0; i < 256; ++i)
 		S[i] = i;
-
-	// S盒初始置换
 	for (size_t i = 0, j = 0; i < 256; i++)
 	{
 		j = (j + S[i] + password[i % len]) % 256;

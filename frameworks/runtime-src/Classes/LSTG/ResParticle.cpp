@@ -2,6 +2,7 @@
 #include "AppFrame.h"
 #include "Utility.h"
 #include "Renderer.h"
+#include "../fcyLib/fcyMemPool.h"
 
 using namespace std;
 using namespace cocos2d;
@@ -323,15 +324,15 @@ ResParticle* ResParticle::create(const std::string& name, const std::string& pat
 	const auto clone = Sprite::createWithSpriteFrame(sprite->getSprite()->getSpriteFrame());
 	if (!clone)
 		return nullptr;
-	const auto data = LRES.getDataFromFile(path);
+	const auto data = LRES.getBufferFromFile(path);
 	if (!data)
 		return nullptr;
-	if (data->getSize() != sizeof(ParticleInfo))
+	if (data->size() != sizeof(ParticleInfo))
 		return nullptr;
 	try
 	{
 		ParticleInfo tInfo{};
-		memcpy(&tInfo, data->getBytes(), sizeof(ParticleInfo));
+		memcpy(&tInfo, data->data(), sizeof(ParticleInfo));
 		tInfo.BlendInfo = (tInfo.BlendInfo >> 16) & 0x00000003;
 		//TODO: move to lua
 		auto blend = BlendMode::getByName("add+alpha");
@@ -351,8 +352,11 @@ ResParticle* ResParticle::create(const std::string& name, const std::string& pat
 		}
 		if (!blend)
 			return nullptr;
-		return new (nothrow) ResParticle(name, tInfo, clone,
+		auto ret = new (nothrow) ResParticle(name, tInfo, clone,
 			blend, a, b, colliType);
+		if (ret)
+			ret->resPath = path;
+		return ret;
 	}
 	catch (const bad_alloc&)
 	{

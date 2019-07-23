@@ -1,11 +1,9 @@
-﻿/// @file Utility.h
-/// @brief 实用工具
-#pragma once
+﻿#pragma once
 #include "Global.h"
+#include "../fcyLib/fcyMisc/fcyStopWatch.h"
 
 namespace lstg
 {
-	/// @brief 域
 	class Scope
 	{
 	private:
@@ -21,7 +19,6 @@ namespace lstg
 		}
 	};
 
-	/// @brief 计时域
 	class TimerScope
 	{
 	private:
@@ -38,11 +35,9 @@ namespace lstg
 		}
 	};
 
-	/// @brief 字符串格式化
-	/// @param Format 字符串格式，不支持精度
 	std::string StringFormat(const char* Format, ...)noexcept;
 
-	/** @brief 字符串格式化 va_list版本\n
+	/** @brief string format, va_list\n
 	* @code
 	* bool     b; int32_t   c; unsigned int p;
 	* int32_t  d; uint32_t  u; double  f;
@@ -51,21 +46,8 @@ namespace lstg
 	*/
 	std::string StringFormatV(const char* Format, va_list vaptr)noexcept;
 
-	/// @brief 字符串格式化 宽字符
-	/// @param Format 字符串格式，不支持精度
-	std::wstring StringFormat(const wchar_t* Format, ...)noexcept;
-
-	/** @brief 字符串格式化 宽字符、va_list版本\n
-	* @code
-	* bool     b; int32_t   c; unsigned int p;
-	* int32_t  d; uint32_t  u; double  f;
-	* int64_t ld; uint64_t lu; double lf;
-	* char*    m; wchar_t*  s; @endcode
-	*/
-	std::wstring StringFormatV(const wchar_t* Format, va_list vaptr)noexcept;
-
-	/// @brief 打印Lua堆栈
-	void stackDump(lua_State *L);
+	/** dump lua stack */
+	std::string stackDump(lua_State *L);
 
 	std::string ReplacePathSep(std::string path, const std::string& ori = "\\", const std::string& dst = "/");
 
@@ -110,10 +92,11 @@ namespace lstg
 
 	cocos2d::Image* GetTextureImage(cocos2d::Texture2D* texture, bool flipImage);
 
-	// (start, end)
-	void deployThreadTask(size_t taskSize, size_t nSlice, const std::function<void(int, int)>& task);
 	// (start, end, iThread)
 	void deployThreadTask(size_t taskSize, size_t nSlice, const std::function<void(int, int, int)>& task);
+	void deployThreadTaskAndWait(size_t taskSize, size_t nSlice, const std::function<void(int, int, int)>& task);
+	std::vector<std::future<std::shared_ptr<void>>> deployThreadTaskFuture(size_t taskSize, size_t nSlice,
+		const std::function<std::shared_ptr<void>(int, int, int)>& task);
 
 	// RC4 cryption
 	class RC4

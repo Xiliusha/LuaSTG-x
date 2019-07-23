@@ -52,10 +52,11 @@ bool XFileUtils::init()
 	return ret;
 }
 
-string XFileUtils::getStringFromFile(const string& filename)
+string XFileUtils::getStringFromFile(const string& filename) const
 {
 	if (filename.empty())
 	{
+		//CCLOG("XFileUtils: filename is empty");
 		return "";
 	}
 
@@ -66,13 +67,10 @@ string XFileUtils::getStringFromFile(const string& filename)
 		return i->second;
 	}
 	// via ResourceMgr
-	const auto data = LRES.getDataFromFile(filename);
-	if (data)
-		return string((const char*)data->getBytes(), (size_t)data->getSize());// internal copied
-	return "";
+	return LRES.getStringFromFile(filename);
 }
 
-Data XFileUtils::getDataFromFile(const string& filename)
+Data XFileUtils::getDataFromFile(const string& filename) const
 {
 	Data d;
 	if (filename.empty())
@@ -80,7 +78,10 @@ Data XFileUtils::getDataFromFile(const string& filename)
 		//CCLOG("XFileUtils: filename is empty");
 	}
 	else
-		d = LRES.getDataCopyFromFile(filename);
+	{
+		const auto data = LRES.getBufferFromFile(filename);
+		d.copy(data->data(), data->size());
+	}
 	return d;
 }
 
@@ -143,7 +144,7 @@ vector<string> XFileUtils::listFiles(const string& dirPath) const
 	return ret;
 }
 
-string XFileUtils::getFullPathForDirectoryAndFilename(const string& directory, const string& filename) const
+string XFileUtils::getFullPathForFilenameWithinDirectory(const string& directory, const string& filename) const
 {
 #if CC_TARGET_PLATFORM == CC_PLATFORM_WIN32
 	string dir = convertPathFormatToUnixStyle(directory);
@@ -158,7 +159,7 @@ string XFileUtils::getFullPathForDirectoryAndFilename(const string& directory, c
 		ret = "";
 	return ret;
 #else
-	return _FileUtilsBase::getFullPathForDirectoryAndFilename(directory, filename);
+	return _FileUtilsBase::getFullPathForFilenameWithinDirectory(directory, filename);
 #endif
 }
 

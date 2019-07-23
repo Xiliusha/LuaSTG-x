@@ -3,7 +3,7 @@
 #include "../Math/XMath.h"
 #include "CollisionDetect.h"
 #include "MemPoolManager.h"
-#include "Renderer.h"
+#include "UtilLuaConversion.h"
 
 using namespace std;
 using namespace lstg;
@@ -43,7 +43,7 @@ static int ATan2(lua_State* L) noexcept
 	lua_pushnumber(L, atan2(luaL_checknumber(L, 1), luaL_checknumber(L, 2)) * LRAD2DEGREE);
 	return 1;
 }
-static int SinCos(lua_State* L) noexcept //TODO
+static int SinCos(lua_State* L) noexcept
 {
 	const auto angle = luaL_checknumber(L, 1) * LDEGREE2RAD;
 	const auto s = std::sin(angle);
@@ -73,9 +73,13 @@ static int SampleBezierA1_(lua_State* L) noexcept
 		out_y.push_back(p.y);
 	}
 
-	lua::pushArray(L,out_x);
-	lua::pushArray(L,out_y);
-	lua::pushArray(L,out_rot);
+	//lua::pushArray(L,out_x);
+	//lua::pushArray(L,out_y);
+	//lua::pushArray(L,out_rot);
+
+	lua::native_to_luaval(L, out_x);
+	lua::native_to_luaval(L, out_y);
+	lua::native_to_luaval(L, out_rot);
 	return 3;
 }
 
@@ -89,6 +93,8 @@ vector<luaL_Reg> lstg::LW_Math()
 		{ "tan", &Tan },
 		{ "atan", &ATan },
 		{ "atan2", &ATan2 },
+
+		{ "sincos", &SinCos },
 
 		{ "SampleBezierA1", &SampleBezierA1_ },
 	};

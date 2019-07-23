@@ -1,23 +1,24 @@
 ﻿#include "LW_Frame.h"
 #include "AppFrame.h"
 #include "Renderer.h"
+#include "tolua_fix.h"
+#include "CCLuaEngine.h"
 
 using namespace std;
 using namespace lstg;
-using namespace cocos2d;
 
 static int SetFPS(lua_State* L) noexcept
 {
 	int v = luaL_checkinteger(L, 1);
 	if (v <= 0)
 		v = 60;
-	LAPP.SetFPS(static_cast<uint32_t>(v));
+	LAPP.setFPS(static_cast<uint32_t>(v));
 	return 0;
 }
 
 static int GetFPS(lua_State* L) noexcept
 {
-	lua_pushnumber(L, LAPP.GetFPS());
+	lua_pushnumber(L, LAPP.getFPS());
 	return 1;
 }
 
@@ -59,7 +60,7 @@ static int Print(lua_State* L) noexcept
 
 static int DoFile(lua_State* L) noexcept
 {
-	LAPP.LoadScript(luaL_checkstring(L, 1));
+	LAPP.loadScript(luaL_checkstring(L, 1));
 	return 0;
 }
 
@@ -70,6 +71,21 @@ static int ShowSplashWindow(lua_State* L) noexcept
 	else
 		LAPP.ShowSplashWindow(luaL_checkstring(L, 1));
 	return 0;
+}
+
+static int SetThreadPoolSize(lua_State* L) noexcept
+{
+	const auto val = luaL_checkinteger(L, 1);
+	if (val < 0)
+		return luaL_error(L, "invalid argument");
+	LTHP.resize(val);
+	return 0;
+}
+
+static int GetThreadPoolSize(lua_State* L) noexcept
+{
+	lua_pushinteger(L, LTHP.size());
+	return 1;
 }
 
 static int FrameInit(lua_State* L) noexcept
@@ -90,27 +106,38 @@ static int FrameReset(lua_State* L) noexcept
 	return 0;
 }
 
+static int SetOnWriteLog(lua_State* L) noexcept
+{
+	const auto handler = toluafix_ref_function(L, 1, 0);
+	if (handler == 0)
+		return luaL_error(L, "invalid argument");
+	LLOGGER.setOnWrite([=](const std::string& str)
+	{
+		auto stack = cocos2d::LuaEngine::getInstance()->getLuaStack();
+		stack->pushString(str.c_str(), str.size());
+		stack->executeFunctionByHandler(handler, 1);
+		stack->clean();
+	});
+	return 0;
+}
+
 vector<luaL_Reg> lstg::LW_Frame()
 {
 	vector<luaL_Reg> ret = {
-		//{ "SetWindowed", &SetWindowed },
 		{ "SetFPS", &SetFPS },
 		{ "GetFPS", &GetFPS },
 		{ "SetVsync", &SetVsync },
-		//{ "SetResolution", &SetResolution },
-		//{ "ChangeVideoMode", &ChangeVideoMode },
-		//{ "SetSplash", &SetSplash },
-		//{ "SetTitle", &SetTitle },
 		{ "SystemLog", &SystemLog },
 		{ "Print", &Print },
-		//{ "LoadPack", &LoadPack },
-		//{ "UnloadPack", &UnloadPack },
-		//{ "ExtractRes", &ExtractRes },
 		{ "DoFile", &DoFile },
 		{ "ShowSplashWindow", &ShowSplashWindow },
 
+		{ "SetThreadPoolSize", &SetThreadPoolSize },
+		{ "GetThreadPoolSize", &GetThreadPoolSize },
+
 		{ "FrameInit", &FrameInit },
 		{ "FrameReset", &FrameReset },
+		{ "SetOnWriteLog", &SetOnWriteLog },
 	};
 	return ret;
 }

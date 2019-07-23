@@ -2,10 +2,10 @@
 #include "AppFrame.h"
 #include "LuaWrapper.h"
 #include "UnicodeStringEncoding.h"
-#include "Utility.h"
 #include "UtilLua.h"
 #include "Renderer.h"
 #include "UtilLuaRes.h"
+#include "../fcyLib/fcyMisc/fcyStringHelper.h"
 
 using namespace std;
 using namespace lstg;
@@ -104,7 +104,7 @@ static int CalcTextSize(lua_State* L)
 	if (!p)
 		return error_find(L, 1);
 	auto text = luaL_checkstring(L, 2);
-	// 编码转换 TODO: ???
+	// TODO: ???
 	static wstring s_TempStringBuf;
 	string txt;
 	try
