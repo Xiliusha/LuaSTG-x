@@ -4,6 +4,7 @@
 #include "Utility.h"
 #include "LuaWrapper.h"
 #include "AppFrame.h"
+#include "LogSystem.h"
 #include "LWColor.h"
 
 using namespace std;
@@ -63,7 +64,7 @@ IMPL_BASIC_FROM_NATIVE(texParams_to_luaval, cocos2d::Texture2D::TexParams);
 
 template<typename T>
 bool __luaval_to_integer(lua_State* L, int lo,
-	typename std::enable_if<std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t>, T>::type* outValue,
+	typename std::enable_if<std::is_same<T, int64_t>::value || std::is_same<T, uint64_t>::value, T>::type* outValue,
 	size_t targetSize, const char* funcName)
 {
 	if (nullptr == L || nullptr == outValue)
@@ -71,7 +72,7 @@ bool __luaval_to_integer(lua_State* L, int lo,
 	const auto type = lua_type(L, lo);
 	if (type == lua::LUA_TCDATA)
 	{
-		if(std::is_same_v<T, int64_t>)
+		if(std::is_same<T, int64_t>::value)
 			lua_pushstring(L, "ffi.cast_int64");
 		else
 			lua_pushstring(L, "ffi.cast_uint64");
@@ -107,7 +108,7 @@ bool __luaval_to_integer(lua_State* L, int lo,
 #endif
 		return false;
 	}
-	if (std::is_same_v<T, int64_t> && targetSize == 4)
+	if (std::is_same<T, int64_t>::value && targetSize == 4)
 	{
 		// see luaval_to_int32
 		const uint32_t estimateValue = (uint32_t)lua_tonumber(L, lo);
@@ -556,11 +557,15 @@ bool lua::luaval_to_async_callback(lua_State* L, int lo, std::function<void()>* 
 	return true;
 }
 
-void lua::ref_type_to_luaval(lua_State* L, cocos2d::Ref* ref)
+void lua::ref_type_to_luaval(lua_State* L, cocos2d::Ref* ref, const char* typeID)
 {
 	if (ref)
 	{
-		const std::string typeName = typeid(*ref).name();
+		std::string typeName;
+		if (typeID)
+			typeName = typeID;
+		else
+			typeName = typeid(*ref).name();
 		const auto iter = g_luaType.find(typeName);
 		auto type = "cc.Ref";
 		if (g_luaType.end() != iter)
